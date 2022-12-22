@@ -5,15 +5,15 @@ import {IERC20} from "solidity-standard-interfaces/IERC20.sol";
 uint256 constant ERC20_TRANSFER_SIGNATURE = 0xa9059cbb00000000000000000000000000000000000000000000000000000000;
 uint256 constant ERC20_TRANSFER_SIGNATURE_POINTER = 0x00;
 uint256 constant ERC20_TRANSFER_RECIPIENT_POINTER = 0x04;
-uint256 constant ERC20_TRANSFER_AMOUNT_POINTER = 0x18;
-uint256 constant ERC20_TRANSFER_MESSAGE_LENGTH = 0x38;
+uint256 constant ERC20_TRANSFER_AMOUNT_POINTER = 0x24;
+uint256 constant ERC20_TRANSFER_MESSAGE_LENGTH = 0x44;
 
 uint256 constant ERC20_TRANSFER_FROM_SIGNATURE = 0x23b872dd00000000000000000000000000000000000000000000000000000000;
 uint256 constant ERC20_TRANSFER_FROM_SIGNATURE_POINTER = 0x00;
 uint256 constant ERC20_TRANSFER_FROM_OWNER_POINTER = 0x04;
-uint256 constant ERC20_TRANSFER_FROM_RECIPIENT_POINTER = 0x18;
-uint256 constant ERC20_TRANSFER_FROM_AMOUNT_POINTER = 0x2C;
-uint256 constant ERC20_TRANSFER_FROM_MESSAGE_LENGTH = 0x4C;
+uint256 constant ERC20_TRANSFER_FROM_RECIPIENT_POINTER = 0x24;
+uint256 constant ERC20_TRANSFER_FROM_AMOUNT_POINTER = 0x44;
+uint256 constant ERC20_TRANSFER_FROM_MESSAGE_LENGTH = 0x64;
 
 /// @title A library which provides helpers to handle safely handle transfers for ERC20 tokens
 /// @custom:coauthor Ainmox (https://github.com/ainmox)
@@ -32,10 +32,13 @@ library SafeERC20 {
                 revert(0, 0)
             }
 
+            let pointer := mload(0x40)
+
             // Build the following message in memory:
             // memory[0x00:0x38] = ERC20_TRANSFER_SIGNATURE ++ recipient ++ amount
             //
-            // This writes to scratch space (0x00-0x3f) so we do not need to reset the memory after.
+            // IMPORTANT: This writes to scratch space (0x00-0x3f), the partially overwrites the free memory pointer
+            // (0x40-0x44) so after calling the contract we will need to reset the memory pointer.
             mstore(ERC20_TRANSFER_SIGNATURE_POINTER, ERC20_TRANSFER_SIGNATURE)
             mstore(ERC20_TRANSFER_RECIPIENT_POINTER, recipient)
             mstore(ERC20_TRANSFER_AMOUNT_POINTER, amount)
@@ -69,6 +72,9 @@ library SafeERC20 {
                     0x32                              /* retLength */
                 )
             )
+
+            // Restore the memory pointer
+            mstore(0x40, pointer)
         }
 
         require(success);
@@ -92,10 +98,10 @@ library SafeERC20 {
             let pointer := mload(0x40)
 
             // Build the following message in memory:
-            // memory[0x00:0x38] = ERC20_TRANSFER_FROM_SIGNATURE ++ owner ++ recipient ++ amount
+            // memory[0x00:0x64] = ERC20_TRANSFER_FROM_SIGNATURE ++ owner ++ recipient ++ amount
             //
-            // IMPORTANT: This writes to scratch space (0x00-0x3f) and partially writes over the free memory pointer
-            // (0x40-0x4C) so we will need to reset the memory pointer after but not the scratch space.
+            // IMPORTANT: This writes to scratch space (0x00-0x3f), the free memory pointer (0x40-0x64), and the
+            // zero slot so after calling the contract we will need to reset the memory pointer and zero slot.
             mstore(ERC20_TRANSFER_FROM_SIGNATURE_POINTER, ERC20_TRANSFER_FROM_SIGNATURE)
             mstore(ERC20_TRANSFER_FROM_OWNER_POINTER, owner)
             mstore(ERC20_TRANSFER_FROM_RECIPIENT_POINTER, recipient)
@@ -131,8 +137,9 @@ library SafeERC20 {
                 )
             )
 
-            // Restore the memory pointer
+            // Restore the memory pointer and zero slot
             mstore(0x40, pointer)
+            mstore(0x60, 0)
         }
 
         require(success);
