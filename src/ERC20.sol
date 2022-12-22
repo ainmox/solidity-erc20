@@ -54,4 +54,31 @@ contract ERC20 is IERC20 {
 
         emit Transfer(msg.sender, recipient, amount);
     }
+
+    /// @dev Mint `amount` tokens to `recipient`
+    /// @param recipient The address of the recipient
+    /// @param amount The amount of tokens to mint
+    function _mint(address recipient, uint256 amount) internal {
+        totalSupply += amount;
+        unchecked {
+            balanceOf[recipient] += amount;
+        }
+
+        emit Transfer(address(0), recipient, amount);
+    }
+
+    /// @dev Burn `amount` tokens from `account`
+    /// @param owner The address of the account
+    /// @param amount The amount of tokens to burn
+    function _burn(address owner, uint256 amount) internal {
+        uint256 ownerBalance = balanceOf[owner];
+        require(ownerBalance >= amount);
+
+        unchecked {
+            totalSupply -= amount;
+            balanceOf[owner] = ownerBalance - amount;
+        }
+
+        emit Transfer(owner, address(0), amount);
+    }
 }
